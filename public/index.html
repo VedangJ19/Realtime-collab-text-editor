@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Real-Time Collaborative Editor</title>
+    <script src="/socket.io/socket.io.js"></script>
+    <script src="/ot.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const socket = io();
+            let documentState = new ot.TextOperation();
+            let lastValue = '';
+
+            function applyOperation(operation) {
+                documentState = documentState.compose(operation);
+                const editor = document.getElementById('editor');
+                lastValue = documentState.apply('');
+            }
+
+            socket.on('operation', (operationData) => {
+                const operation = ot.TextOperation.fromJSON(operationData);
+                applyOperation(operation);
+            });
+
+            document.getElementById('editor').addEventListener('input', function(e) {
+                const currentValue = e.target.value;
+                const operation = new ot.TextOperation();
+                
+                if (currentValue.length > lastValue.length) {
+                    const startPos = lastValue.length;
+                    const insertedText = currentValue.slice(startPos);
+                    operation.retain(startPos).insert(insertedText);
+                    socket.emit('operation', operation.toJSON()); }
+                lastValue = currentValue;
+            });
+
+            socket.on('doc', (initialDocState) => {
+                documentState = ot.TextOperation.fromJSON(initialDocState);
+                document.getElementById('editor').value = documentState.apply('');
+                lastValue = document.getElementById('editor').value;
+            });
+        });
+    </script>
+</head>
+<body>
+    <textarea id="editor" rows="10" cols="50">Start editing...</textarea>
+</body>
+</html>
